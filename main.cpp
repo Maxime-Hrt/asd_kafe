@@ -148,8 +148,8 @@ void fillMenu(Node* root, const vector<tuple<string, vector<pair<string, vector<
     }
 }
 
-int main() {
-    Node* root = new Node("Menu");
+void insertall(Node* root){
+    //Node* root = new Node("Menu");
 
     vector<tuple<string, vector<pair<string, vector<tuple<string, float, int>>>>>> menuData = {
             {"Roti dan kue", {
@@ -203,10 +203,14 @@ int main() {
                 }}
             }}
     };
-
-    // Fill the menu tree with the data
+     // Fill the menu tree with the data
     fillMenu(root, menuData);
 
+}
+
+int main() {
+    Node* root = new Node("Menu");
+    insertall(root);
     // Display the tree to verify
     displayTree(root);
 
@@ -215,4 +219,3 @@ int main() {
 
     return 0;
 }
-
