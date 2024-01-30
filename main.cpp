@@ -208,14 +208,95 @@ void insertall(Node* root){
 
 }
 
+void inputNewSubCategory(Node* root) {
+    string category, itemName;
+    float itemPrice;
+    int itemStock;
+
+    cout << "Category: ";
+    getline(cin, category);
+
+    Node* categoryNode = findNode(root, category);
+
+    if (categoryNode) {
+        cout << "SubCategory : ";
+        getline(cin, itemName);
+
+        Node* newSubCategory = addItem(categoryNode, itemName, 0, 0);
+        cout << "Subcategory ditambahkan!" << endl;
+    } else {
+        cout << "Category tidak ditemukan!" << endl;
+    }
+
+    char choice;
+    do {
+        cout << "\nTambah subcategory lagi? (y/n): ";
+        cin >> choice;
+        cin.ignore();
+
+        if (choice == 'y' || choice == 'Y') {
+            inputNewSubCategory(root);
+        }
+    } while (choice == 'y' || choice == 'Y');
+    }
+
+void inputNewItem(Node* root) {
+    string Category, SubCategory, itemName;
+    float itemPrice;
+    int itemStock;
+
+    cout << "Category: ";
+    getline(cin, Category);
+
+    Node* CategoryNode = findNode(root, Category);
+
+    if (CategoryNode) {
+
+        cout << "SubCategory: ";
+        getline(cin, SubCategory);
+
+        Node* SubCategoryNode = findNode(root, SubCategory);
+
+        if(SubCategoryNode){
+        cout << "Nama Item : ";
+        getline(cin, itemName);
+
+        cout << "Harga Item : ";
+        cin >> itemPrice;
+
+        cout << "Stok Item : ";
+        cin >> itemStock;
+
+        addItem(SubCategoryNode, itemName, itemPrice, itemStock);
+        cout << "Item ditambahkan!" << endl;
+    } else {
+        cout << "Sub Category Tidak ditemukan!" << endl;
+    }
+    } else {
+        cout << "Category tidak ditemukan! " << endl;
+    }
+
+    char choice;
+    do {
+        cout << "\nTambah Item lagi ? (y/n): ";
+        cin >> choice;
+        cin.ignore();
+
+        if (choice == 'y' || choice == 'Y') {
+            inputNewItem(root);
+        }
+    } while (choice == 'y' || choice == 'Y');
+}
+
 int main() {
     Node* root = new Node("Menu");
     insertall(root);
     // Display the tree to verify
     displayTree(root);
+    inputNewSubCategory(root);
 
-    // Delete the tree and free memory
-    deleteTree(root);
+    // inputNewItem(root);
+    displayTree(root);
 
     return 0;
 }
