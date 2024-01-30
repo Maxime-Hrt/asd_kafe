@@ -314,7 +314,7 @@ void insertAll(Node* root){
                 }}
             }}
     };
-    // Fill the menu tree with the data
+     // Fill the menu tree with the data
     fillMenu(root, menuData);
 }
 
@@ -333,7 +333,6 @@ linkedList* addEvent(linkedList* head, const Event& data) {
         return head; // La tête ne change pas
     }
 }
-
 
 linkedList* findOne(linkedList* head, const int& id) {
     if (!head) return nullptr;
@@ -484,7 +483,7 @@ int main() {
                             cout << "Pilihan tidak tersedia" << endl;
                             break;
                     }
-                    cout << "Current event" << endl;
+                    cout << endl << "Current event" << endl;
                     displayEvents(eventList);
 //                    currentEvent.push_back(eventNew);
 //                    for (const Event& event : currentEvent) {
