@@ -2,8 +2,12 @@
 #include <string>
 #include <vector>
 #include <tuple>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
+using namespace std::chrono;
 
 struct Node {
     string name; // Nama kategori atau item
@@ -12,7 +16,6 @@ struct Node {
     Node* leftChild; // Anak kiri
     Node* rightChild; // Anak kanan
 
-    // Konstruktor untuk kategori (tidak ada harga dan stok)
     explicit Node(const string& name) {
         this->name = name;
         this->price = 0;
@@ -21,7 +24,6 @@ struct Node {
         this->rightChild = nullptr;
     }
 
-    // Konstruktor untuk item (ada harga dan stok)
     Node(const string& name, float price, int stock) {
         this->name = name;
         this->price = price;
@@ -30,7 +32,6 @@ struct Node {
         this->rightChild = nullptr;
     }
 
-    // Memeriksa apakah node merupakan kategori atau item
     bool isItem() const {
         return this->price != 0 || this->stock != 0;
     }
@@ -40,27 +41,23 @@ static int nextEventId = 1; // ID untuk event
 
 struct Event {
     int orderId;
-    int status; // 0 = pending, 1 = done
+    int status; // 0 = menunggu, 1 = selesai
     string menu;
     vector<pair<string, int>> items;
+    string date; // Tanggal event
 
     Event() : orderId(nextEventId++), status(0) {}
 };
 
 struct EventCategory {
     string name;
-    vector<string> category; // Kategori yang menjadi fokus
+    vector<string> category;
 
     EventCategory() = default;
 
-    EventCategory(const string& name, const vector<string>& focus) {
+    EventCategory(const string& name, const vector<string>& category) {
         this->name = name;
-        this->category = focus;
-    }
-
-    EventCategory(const string& name, const string& focus) {
-        this->name = name;
-        this->category.push_back(focus);
+        this->category = category;
     }
 };
 
@@ -74,23 +71,29 @@ struct linkedList {
     }
 };
 
-// Menu function
+// Deklarasi fungsi
 Node* addItem(Node* parent, const string& name, float price, int stock);
 Node* addCategory(Node* parent, const string& name);
-void displayTree(Node* root, int depth);
-void displayItemsFromCategory(Node* root, const string& categoryName, int& itemNumber);
+void displayTree(Node* root, int depth, vector<string>& availableCategories);
+void displayItemsFromCategory(Node* root, const string& categoryName, int& itemNumber, vector<Node*>& items);
 void displayItems(Node* node, int& itemNumber, vector<Node*>& items);
 void deleteTree(Node* root);
 void editNode(Node* root, const string& name, const string& newName, float newPrice, int newStock);
 Node* findNode(Node* root, const string& name);
 void fillMenu(Node* root, const vector<tuple<string, vector<pair<string, vector<tuple<string, float, int>>>>>>& menuData);
 void insertAll(Node* root);
-
-// Event function
 linkedList* addEvent(linkedList* head, const Event& data);
 linkedList* findOne(linkedList* head, const int& id);
 void displayStartingMenu();
 void displayEvents(linkedList* head);
+void chooseAndAddItemsToEvent(Node* root, Event& event, const vector<string>& categories);
+void displayEventChoice();
+void displayMenuChoice(const vector<EventCategory>& customMenus);
+void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCategory>& customMenus, int choice, const string& date);
+EventCategory createNewMenu(Node* root);
+void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory);
+string getCurrentDate();
+void displayOrderHistory(const vector<Event>& orderHistory);
 
 // MENU
 // Fungsi untuk menambahkan kategori baru
@@ -174,6 +177,7 @@ void displayTree(Node* root, int depth, vector<string>& availableCategories) {
     }
 }
 
+// Fungsi untuk menampilkan item dari kategori tertentu
 void displayItemsFromCategory(Node* root, const string& categoryName, int& itemNumber, vector<Node*>& items) {
     if (!root) return;
 
@@ -187,6 +191,7 @@ void displayItemsFromCategory(Node* root, const string& categoryName, int& itemN
     }
 }
 
+// Fungsi untuk menampilkan item
 void displayItems(Node* node, int& itemNumber, vector<Node*>& items) {
     if (!node) return;
 
@@ -354,6 +359,7 @@ linkedList* addEvent(linkedList* head, const Event& data) {
     }
 }
 
+// Fungsi untuk mencari event dengan ID tertentu
 linkedList* findOne(linkedList* head, const int& id) {
     if (!head) return nullptr;
 
@@ -365,64 +371,73 @@ linkedList* findOne(linkedList* head, const int& id) {
     return findOne(head->next, id);
 }
 
+// Menampilkan menu awal
 void displayStartingMenu() {
     cout << "1. Buka cafe" << endl;
     cout << "2. Keluar" << endl;
-    cout << "3. Exit code" << endl;
+    cout << "3. Menampilkan riwayat pesanan" << endl;
+    cout << "4. Exit code" << endl;
 }
 
+// Menampilkan event
 void displayEvents(linkedList* head) {
     linkedList* current = head;
     while (current != nullptr) {
+        cout << endl << "========================" << endl;
         cout << "Order ID: " << current->data.orderId << endl;
+        cout << "Date: " << current->data.date << endl;
         cout << "Menu: " << current->data.menu << endl;
         cout << "Status: " << (current->data.status == 0 ? "Pending" : "Done") << endl;
         cout << "Items: " << endl;
         for (const auto& item : current->data.items) {
-            cout << item.first << " - " << item.second << endl;
+            cout << "\t* " << item.first << " - " << item.second << endl;
         }
         cout << endl;
         current = current->next;
     }
 }
 
+// Fungsi untuk memilih dan menambahkan item ke event
 void chooseAndAddItemsToEvent(Node* root, Event& event, const vector<string>& categories) {
+
+    if (!root) return;
+
     for (const auto& category : categories) {
         int itemNumber = 1;
-        vector<Node*> itemsVector; // Ce vecteur va garder la trace des pointeurs vers les items affichés
+        vector<Node*> itemsVector; // Vector untuk menyimpan item dari kategori tertentu
 
-        cout << "Choisissez un item de la catégorie " << category << ":" << endl;
+        cout << "Pick items from " << category << endl;
         displayItemsFromCategory(root, category, itemNumber, itemsVector);
 
         int selectedItemNumber = 0;
         int quantity = 0;
 
         while (true) {
-            cout << "Entrez le numéro de l'item: ";
+            cout << "Pilih item: ";
             cin >> selectedItemNumber;
 
             if (cin.fail() || selectedItemNumber < 1 || selectedItemNumber > itemsVector.size()) {
-                // Si l'entrée n'est pas valide ou hors de l'intervalle, on efface et on réessaye
-                cin.clear(); // Effacer le flag d'erreur de cin
-                cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Ignorer le reste de la ligne
-                cout << "Numéro d'item invalide, veuillez réessayer." << endl;
+                // Jika input bukan angka atau angka yang tidak valid, hapus dan coba lagi
+                cin.clear(); // Hapus flag kesalahan dari cin
+                cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Abaikan sisa baris
+                cout << "Nomor item tidak valid, silakan coba lagi." << endl;
             } else {
-                // Si le numéro est valide, on casse la boucle
+                // Jika nomor item valid, hentikan loop
                 break;
             }
         }
 
         while (true) {
-            cout << "Entrez la quantité pour " << itemsVector[selectedItemNumber - 1]->name << ": ";
+            cout << "Masukkan jumlah: " << itemsVector[selectedItemNumber - 1]->name << ": ";
             cin >> quantity;
 
             if (cin.fail() || quantity < 1) {
-                // Si l'entrée n'est pas un nombre ou est inférieur à 1, on efface et on réessaye
-                cin.clear(); // Effacer le flag d'erreur de cin
-                cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Ignorer le reste de la ligne
-                cout << "Quantité invalide, veuillez réessayer." << endl;
+                // Jika jumlah tidak valid, hapus dan coba lagi
+                cin.clear(); // Hapus flag kesalahan dari cin
+                cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Abaikan sisa baris
+                cout << "Jumlah tidak valid, silakan coba lagi." << endl;
             } else {
-                // Si la quantité est valide, on casse la boucle
+                // Jika jumlah valid, hentikan loop
                 break;
             }
         }
@@ -432,20 +447,22 @@ void chooseAndAddItemsToEvent(Node* root, Event& event, const vector<string>& ca
     }
 }
 
-
+// Menampilkan pilihan event
 void displayEventChoice() {
     cout << "1. Tambah event" << endl;
     cout << "2. Display event" << endl;
 }
 
+// Menampilkan pilihan menu
 void displayMenuChoice(const vector<EventCategory>& customMenus) {
+    cout << "------------------------" << endl;
     cout << "1. Breakfast" << endl;
     cout << "2. Morning Coffee / Tea Time / Afternoon Coffee" << endl;
     cout << "3. Brunch" << endl;
     cout << "4. Lunch" << endl;
     cout << "5. Dinner" << endl;
 
-    // Afficher les menus personnalisés
+    // Menampilkan menu-menu yang telah dibuat
     int customMenuStartIndex = 6; // Commence après les choix de menu prédéfinis
     for (int i = 0; i < customMenus.size(); i++) {
         cout << customMenuStartIndex + i << ". " << customMenus[i].name << endl;
@@ -453,13 +470,17 @@ void displayMenuChoice(const vector<EventCategory>& customMenus) {
 
     cout << customMenuStartIndex + customMenus.size() << ". Tambah new Event" << endl;
     cout << customMenuStartIndex + customMenus.size() + 1 << ". Display Orders" << endl;
-    cout << customMenuStartIndex + customMenus.size() + 2 << ". Back" << endl;
+    cout << customMenuStartIndex + customMenus.size() + 2 << ". Menyajikan Event" << endl;
+    cout << customMenuStartIndex + customMenus.size() + 3 << ". Back" << endl;
+    cout << "------------------------" << endl;
 }
 
-void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCategory>& customMenus, int choice) {
+// Fungsi untuk menangani pilihan menu
+void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCategory>& customMenus, int choice, const string& date) {
     Event eventNew;
+    eventNew.date = date;
 
-    // Gérer les choix prédéfinis
+    // Pilihan menu awal
     switch (choice) {
         case 1:
             cout << "Breakfast" << endl;
@@ -488,8 +509,9 @@ void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCate
             break;
     }
 
+    // Pilihan menu yang telah dibuat
     if (choice >= 6 && choice < 6 + customMenus.size()) {
-        int menuIndex = choice - 6; // Ajuster pour les menus personnalisés
+        int menuIndex = choice - 6; // Indeks menu yang dipilih
         eventNew.menu = customMenus[menuIndex].name;
         chooseAndAddItemsToEvent(root, eventNew, customMenus[menuIndex].category);
     }
@@ -497,9 +519,16 @@ void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCate
     eventList = addEvent(eventList, eventNew);
 }
 
+// Fungsi untuk membuat menu baru
 EventCategory createNewMenu(Node* root) {
     EventCategory newMenu;
-    cout << "Entrez le nom du nouveau menu : ";
+
+    if (!root) {
+        cout << "Menu tidak tersedia." << endl;
+        return newMenu;
+    }
+
+    cout << "Nama event: ";
     cin.ignore(); // Ignore le '\n' restant dans le buffer
     getline(cin, newMenu.name);
 
@@ -507,25 +536,86 @@ EventCategory createNewMenu(Node* root) {
     int itemNumber = 1;
     vector<string> availableCategories;
 
-    cout << "Catégories disponibles :" << endl;
+    cout << "Pilih kategori yang tersedia:" << endl;
     displayTree(root, 0, availableCategories);
 
     while (true) {
-        cout << "Ajouter une catégorie (entrez 'fin' pour terminer) : ";
+        cout << "Pilih kategori: (masukkan 'sudah' untuk selesai)" << endl;
         getline(cin, categoryName);
-        if (categoryName == "fin") {
+        if (categoryName == "sudah") {
             break;
         }
         if (find(availableCategories.begin(), availableCategories.end(), categoryName) != availableCategories.end()) {
             newMenu.category.push_back(categoryName);
         } else {
-            cout << "Catégorie non disponible." << endl;
+            cout << "Kategori tidak tersedia." << endl;
         }
     }
 
     return newMenu;
 }
 
+// Fungsi untuk mengubah status order
+void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory) {
+    int orderId;
+    cout << "Masukkan ID order yang ingin diubah: ";
+    cin >> orderId;
+
+    linkedList* current = eventList;
+    linkedList* prev = nullptr;
+
+    while (current != nullptr && current->data.orderId != orderId) {
+        prev = current;
+        current = current->next;
+    }
+
+    if (current == nullptr) {
+        cout << "Order tidak ditemukan" << endl;
+        return;
+    }
+
+    // Mengubah status order menjadi 'selesai' dan memindahkannya ke orderHistory
+    current->data.status = 1;
+    orderHistory.push_back(current->data);
+
+    // Menghapus order dari eventList
+    if (prev == nullptr) {
+        eventList = current->next;
+    } else {
+        prev->next = current->next;
+    }
+    delete current;
+}
+
+// Fungsi untuk mendapatkan tanggal saat ini
+string getCurrentDate() {
+    auto now = system_clock::now();
+    auto in_time_t = system_clock::to_time_t(now);
+
+    stringstream ss;
+    ss << put_time(localtime(&in_time_t), "%Y-%m-%d");
+    return ss.str();
+}
+
+// Menampilkan order history
+void displayOrderHistory(const vector<Event>& orderHistory) {
+    if (orderHistory.empty()) {
+        cout << "Tidak ada riwayat pesanan." << endl;
+        return;
+    }
+
+    for (const auto& event : orderHistory) {
+        cout << "Order ID: " << event.orderId << endl;
+        cout << "Date: " << event.date << endl;
+        cout << "Menu: " << event.menu << endl;
+        cout << "Status: " << (event.status == 0 ? "Menunggu" : "Selesai") << endl;
+        cout << "Items: " << endl;
+        for (const auto& item : event.items) {
+            cout << "\t* " << item.first << " - " << item.second << endl;
+        }
+        cout << "--------------------------------" << endl;
+    }
+}
 
 
 int main() {
@@ -534,8 +624,10 @@ int main() {
     insertAll(root);
     linkedList* eventList = nullptr;
     vector<EventCategory> customMenus;
+    vector<Event> orderHistory;
+    string currentDate = getCurrentDate();
 
-    while(statusCafe != 3) {
+    while(statusCafe != 4) {
         displayStartingMenu();
         cout << "Masukkan pilihan: ";
         cin >> statusCafe;
@@ -544,7 +636,7 @@ int main() {
             case 1: // Ouverture du café
                 choice = 0;
                 // Dans main(), section de gestion des choix de menu
-                while(choice != customMenus.size() + 8) {
+                while(choice != customMenus.size() + 9) {
                     displayMenuChoice(customMenus);
                     cout << "Masukkan pilihan: ";
                     cin >> choice;
@@ -553,20 +645,32 @@ int main() {
                         EventCategory newMenu = createNewMenu(root);
                         customMenus.push_back(newMenu);
                     } else if (choice > 0 && choice <= 5) {
-                        handleMenuChoice(root, eventList, customMenus, choice);
+                        handleMenuChoice(root, eventList, customMenus, choice, currentDate);
                     } else if (choice >= 6 && choice < 6 + customMenus.size()) {
-                        handleMenuChoice(root, eventList, customMenus, choice);
+                        handleMenuChoice(root, eventList, customMenus, choice, currentDate);
                     } else if (choice == customMenus.size() + 7) {
-                        displayEvents(eventList); // Afficher les commandes passées
+                        displayEvents(eventList); // Menampilkan event
+                    } else if (choice == customMenus.size() + 8) {
+                        updateOrderStatus(eventList, orderHistory); // Menyajikan event
+                    } else if (choice == customMenus.size() + 9) {
+                        cout << "Kembali ke menu utama" << endl;
                     } else {
                         cout << "Pilihan tidak tersedia" << endl;
                     }
                 }
                 break;
             case 2:
-                cout << "Cafe ditutup" << endl;
+                cout << "kafe ditutup" << endl;
                 break;
             case 3:
+                if (orderHistory.empty()) {
+                    cout << "Tidak ada riwayat pesanan." << endl;
+                    break;
+                }
+                cout << endl << "Menampilkan riwayat pesanan" << endl;
+                displayOrderHistory(orderHistory);
+                break;
+            case 4:
                 cout << "Exit code" << endl;
                 while (eventList) {
                     linkedList* nodeToDelete = eventList;
