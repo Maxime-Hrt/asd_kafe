@@ -94,6 +94,7 @@ EventCategory createNewMenu(Node* root);
 void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory);
 string getCurrentDate();
 void displayOrderHistory(const vector<Event>& orderHistory);
+string nextDay(const string& currentDate);
 
 // MENU
 // Fungsi untuk menambahkan kategori baru
@@ -374,8 +375,9 @@ linkedList* findOne(linkedList* head, const int& id) {
 // Menampilkan menu awal
 void displayStartingMenu() {
     cout << "1. Buka cafe" << endl;
-    cout << "2. Keluar" << endl;
+    cout << "2. Tutup kafe" << endl;
     cout << "3. Menampilkan riwayat pesanan" << endl;
+//    cout << "4. Ke hari berikutnya" << endl;
     cout << "4. Exit code" << endl;
 }
 
@@ -617,9 +619,30 @@ void displayOrderHistory(const vector<Event>& orderHistory) {
     }
 }
 
+string nextDay(const string& currentDate) {
+    tm tmDate = {};
+    stringstream ss(currentDate);
+    ss >> get_time(&tmDate, "%Y-%m-%d"); // Assurez-vous que le format correspond
+
+    // Conversion de tm en time_t, puis en time_point
+    time_t tt = mktime(&tmDate);
+    auto tp = system_clock::from_time_t(tt);
+
+    // Ajout d'un jour
+    tp += hours(24);
+
+    // Conversion en time_t, puis en tm, et finalement en string
+    tt = system_clock::to_time_t(tp);
+    tmDate = *localtime(&tt);
+    stringstream ssOut;
+    ssOut << put_time(&tmDate, "%Y-%m-%d");
+
+    return ssOut.str();
+}
+
 
 int main() {
-    int choice = 0, statusCafe = 0; // Status: 0 close ; 1 open ; 2 exit
+    int choice = 0, statusCafe = 0, choiceOpen = 0; // Status: 0 close ; 1 open ; 2 exit
     Node* root = new Node("Menu");
     insertAll(root);
     linkedList* eventList = nullptr;
@@ -660,7 +683,9 @@ int main() {
                 }
                 break;
             case 2:
-                cout << "kafe ditutup" << endl;
+                cout << "kafe ditutup (pindah ke hari berikutnya)" << endl;
+                currentDate = nextDay(currentDate);
+                cout << "Tanggal hari ini: " << currentDate << endl;
                 break;
             case 3:
                 if (orderHistory.empty()) {
