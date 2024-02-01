@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 #include <tuple>
-#include <chrono>
 #include <sstream>
 #include <iomanip>
 
@@ -45,6 +44,7 @@ struct Event {
     string menu;
     vector<pair<string, int>> items;
     string date; // Tanggal event
+    float totalPrice; // Total harga event
 
     Event() : orderId(nextEventId++), status(0) {}
 };
@@ -272,7 +272,7 @@ void insertAll(Node* root){
             {"Roti dan kue", {
                 {"Viennoiseries", {
                     {"Croissant", 1.99f, 10},
-                    {"Pain au Chocolat", 2.49f, 5},
+                    {"Pain au Chocolat", 2.49f, 2},
                     {"Brioche", 2.99f, 7}
                 }},
                 {"Pastry", {
@@ -374,11 +374,12 @@ linkedList* findOne(linkedList* head, const int& id) {
 
 // Menampilkan menu awal
 void displayStartingMenu() {
-    cout << "1. Buka cafe" << endl;
-    cout << "2. Tutup kafe" << endl;
+    cout << "========================" << endl;
+    cout << "1. Buka kafe" << endl;
+    cout << "2. Tutup kafe (Pindah ke hari berikutnya)" << endl;
     cout << "3. Menampilkan riwayat pesanan" << endl;
-//    cout << "4. Ke hari berikutnya" << endl;
     cout << "4. Exit code" << endl;
+    cout << "========================" << endl;
 }
 
 // Menampilkan event
@@ -394,6 +395,7 @@ void displayEvents(linkedList* head) {
         for (const auto& item : current->data.items) {
             cout << "\t* " << item.first << " - " << item.second << endl;
         }
+        cout << endl << "TOTAL PRICE: " << current->data.totalPrice << endl;
         cout << endl;
         current = current->next;
     }
@@ -401,8 +403,9 @@ void displayEvents(linkedList* head) {
 
 // Fungsi untuk memilih dan menambahkan item ke event
 void chooseAndAddItemsToEvent(Node* root, Event& event, const vector<string>& categories) {
-
     if (!root) return;
+
+    event.totalPrice = 0.0f;
 
     for (const auto& category : categories) {
         int itemNumber = 1;
@@ -433,7 +436,7 @@ void chooseAndAddItemsToEvent(Node* root, Event& event, const vector<string>& ca
             cout << "Masukkan jumlah: " << itemsVector[selectedItemNumber - 1]->name << ": ";
             cin >> quantity;
 
-            if (cin.fail() || quantity < 1) {
+            if (cin.fail() || quantity < 1 || quantity > itemsVector[selectedItemNumber - 1]->stock) {
                 // Jika jumlah tidak valid, hapus dan coba lagi
                 cin.clear(); // Hapus flag kesalahan dari cin
                 cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Abaikan sisa baris
@@ -446,6 +449,13 @@ void chooseAndAddItemsToEvent(Node* root, Event& event, const vector<string>& ca
 
         Node* selectedItem = itemsVector[selectedItemNumber - 1];
         event.items.push_back(make_pair(selectedItem->name, quantity));
+        event.totalPrice += selectedItem->price * float(quantity);
+
+        // Mengurangi stok item
+        selectedItem->stock -= quantity;
+        if (selectedItem->stock <= 0) {
+            deleteNode(root, selectedItem->name);
+        }
     }
 }
 
@@ -535,7 +545,6 @@ EventCategory createNewMenu(Node* root) {
     getline(cin, newMenu.name);
 
     string categoryName;
-    int itemNumber = 1;
     vector<string> availableCategories;
 
     cout << "Pilih kategori yang tersedia:" << endl;
@@ -619,6 +628,7 @@ void displayOrderHistory(const vector<Event>& orderHistory) {
     }
 }
 
+// Fungsi untuk mendapatkan tanggal berikutnya
 string nextDay(const string& currentDate) {
     tm tmDate = {};
     stringstream ss(currentDate);
@@ -639,7 +649,6 @@ string nextDay(const string& currentDate) {
 
     return ssOut.str();
 }
-
 
 int main() {
     int choice = 0, statusCafe = 0, choiceOpen = 0; // Status: 0 close ; 1 open ; 2 exit
@@ -683,8 +692,11 @@ int main() {
                 }
                 break;
             case 2:
-                cout << "kafe ditutup (pindah ke hari berikutnya)" << endl;
+                cout << "Pindah ke hari berikutnya (dan reset menu)" << endl;
                 currentDate = nextDay(currentDate);
+                deleteTree(root);
+                root = new Node("Menu");
+                insertAll(root);
                 cout << "Tanggal hari ini: " << currentDate << endl;
                 break;
             case 3:
