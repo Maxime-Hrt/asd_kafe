@@ -47,6 +47,23 @@ struct Event {
     Event() : orderId(nextEventId++), status(0) {}
 };
 
+struct EventCategory {
+    string name;
+    vector<string> category; // Kategori yang menjadi fokus
+
+    EventCategory() = default;
+
+    EventCategory(const string& name, const vector<string>& focus) {
+        this->name = name;
+        this->category = focus;
+    }
+
+    EventCategory(const string& name, const string& focus) {
+        this->name = name;
+        this->category.push_back(focus);
+    }
+};
+
 struct linkedList {
     Event data;
     linkedList* next;
@@ -139,18 +156,21 @@ void editNode(Node* root, const string& name, const string& newName, float newPr
 }
 
 // Fungsi untuk menampilkan tree
-void displayTree(Node* root, int depth = 0) {
+void displayTree(Node* root, int depth, vector<string>& availableCategories) {
     if (!root) return;
 
     string indent(depth * 2, ' '); // Membuat indentasi
-    cout << indent << root->name << endl; // Menampilkan nama kategori atau item
+    if (!root->isItem()) {
+        availableCategories.push_back(root->name);
+        cout << indent << root->name << endl; // Menampilkan nama kategori
+    }
 
     if (root->leftChild) {
-        displayTree(root->leftChild, depth + 1);
+        displayTree(root->leftChild, depth + 1, availableCategories);
     }
 
     if (root->rightChild) {
-        displayTree(root->rightChild, depth);
+        displayTree(root->rightChild, depth, availableCategories);
     }
 }
 
@@ -418,82 +438,129 @@ void displayEventChoice() {
     cout << "2. Display event" << endl;
 }
 
-void displayMenuChoice() {
+void displayMenuChoice(const vector<EventCategory>& customMenus) {
     cout << "1. Breakfast" << endl;
     cout << "2. Morning Coffee / Tea Time / Afternoon Coffee" << endl;
     cout << "3. Brunch" << endl;
     cout << "4. Lunch" << endl;
     cout << "5. Dinner" << endl;
-    cout << "6. Back" << endl;
+
+    // Afficher les menus personnalisés
+    int customMenuStartIndex = 6; // Commence après les choix de menu prédéfinis
+    for (int i = 0; i < customMenus.size(); i++) {
+        cout << customMenuStartIndex + i << ". " << customMenus[i].name << endl;
+    }
+
+    cout << customMenuStartIndex + customMenus.size() << ". Tambah new Event" << endl;
+    cout << customMenuStartIndex + customMenus.size() + 1 << ". Display Orders" << endl;
+    cout << customMenuStartIndex + customMenus.size() + 2 << ". Back" << endl;
 }
 
+void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCategory>& customMenus, int choice) {
+    Event eventNew;
+
+    // Gérer les choix prédéfinis
+    switch (choice) {
+        case 1:
+            cout << "Breakfast" << endl;
+            eventNew.menu = "Breakfast";
+            chooseAndAddItemsToEvent(root, eventNew, {"Sandwich", "Bread", "Bun", "Minuman"});
+            break;
+        case 2:
+            cout << "Morning Coffee / Tea Time / Afternoon Coffee" << endl;
+            eventNew.menu = "Morning Coffee / Tea Time / Afternoon Coffee";
+            chooseAndAddItemsToEvent(root, eventNew, {"Viennoiseries", "Pastry", "Minuman"});
+            break;
+        case 3:
+            cout << "Brunch" << endl;
+            eventNew.menu = "Brunch";
+            chooseAndAddItemsToEvent(root, eventNew, {"Sandwich", "Bread", "Bun", "Salad", "Sup", "Minuman"});
+            break;
+        case 4:
+            cout << "Lunch" << endl;
+            eventNew.menu = "Lunch";
+            chooseAndAddItemsToEvent(root, eventNew, {"Makanan Utama", "Pastry", "Minuman"});
+            break;
+        case 5:
+            cout << "Dinner" << endl;
+            eventNew.menu = "Dinner";
+            chooseAndAddItemsToEvent(root, eventNew, {"Makanan Utama", "Pastry", "Minuman"});
+            break;
+    }
+
+    if (choice >= 6 && choice < 6 + customMenus.size()) {
+        int menuIndex = choice - 6; // Ajuster pour les menus personnalisés
+        eventNew.menu = customMenus[menuIndex].name;
+        chooseAndAddItemsToEvent(root, eventNew, customMenus[menuIndex].category);
+    }
+
+    eventList = addEvent(eventList, eventNew);
+}
+
+EventCategory createNewMenu(Node* root) {
+    EventCategory newMenu;
+    cout << "Entrez le nom du nouveau menu : ";
+    cin.ignore(); // Ignore le '\n' restant dans le buffer
+    getline(cin, newMenu.name);
+
+    string categoryName;
+    int itemNumber = 1;
+    vector<string> availableCategories;
+
+    cout << "Catégories disponibles :" << endl;
+    displayTree(root, 0, availableCategories);
+
+    while (true) {
+        cout << "Ajouter une catégorie (entrez 'fin' pour terminer) : ";
+        getline(cin, categoryName);
+        if (categoryName == "fin") {
+            break;
+        }
+        if (find(availableCategories.begin(), availableCategories.end(), categoryName) != availableCategories.end()) {
+            newMenu.category.push_back(categoryName);
+        } else {
+            cout << "Catégorie non disponible." << endl;
+        }
+    }
+
+    return newMenu;
+}
+
+
+
 int main() {
-    int choice = 0, statusCafe = 0; // Status: 0 close ;  1 open ; 2 exit
+    int choice = 0, statusCafe = 0; // Status: 0 close ; 1 open ; 2 exit
     Node* root = new Node("Menu");
     insertAll(root);
     linkedList* eventList = nullptr;
+    vector<EventCategory> customMenus;
 
     while(statusCafe != 3) {
         displayStartingMenu();
         cout << "Masukkan pilihan: ";
         cin >> statusCafe;
+
         switch (statusCafe) {
-            case 1:
-                cout << "Cafe dibuka" << endl;
-                while(choice != 6) {
-                    displayMenuChoice();
-                    Event eventNew;
+            case 1: // Ouverture du café
+                choice = 0;
+                // Dans main(), section de gestion des choix de menu
+                while(choice != customMenus.size() + 8) {
+                    displayMenuChoice(customMenus);
                     cout << "Masukkan pilihan: ";
                     cin >> choice;
-                    switch (choice) {
-                        case 1:
-                            cout << "Breakfast" << endl;
-                            eventNew.menu = "Breakfast";
-                            chooseAndAddItemsToEvent(root, eventNew, {"Sandwich", "Bread", "Bun", "Minuman"});
-                            eventList = addEvent(eventList, eventNew);
-                            break;
-                        case 2:
-                            cout << "Morning Coffee / Tea Time / Afternoon Coffee" << endl;
-                            eventNew.menu = "Morning Coffee / Tea Time / Afternoon Coffee";
-                            chooseAndAddItemsToEvent(root, eventNew, {"Viennoiseries", "Pastry", "Minuman"});
-                            eventList = addEvent(eventList, eventNew);
-                            break;
-                        case 3:
-                            cout << "Brunch" << endl;
-                            eventNew.menu = "Brunch";
-                            chooseAndAddItemsToEvent(root, eventNew, {"Sandwich", "Bread", "Bun", "Salad", "Sup", "Minuman"});
-                            eventList = addEvent(eventList, eventNew);
-                            break;
-                        case 4:
-                            cout << "Lunch" << endl;
-                            eventNew.menu = "Lunch";
-                            chooseAndAddItemsToEvent(root, eventNew, {"Makanan Utama", "Pastry", "Minuman"});
-                            eventList = addEvent(eventList, eventNew);
-                            break;
-                        case 5:
-                            cout << "Dinner" << endl;
-                            eventNew.menu = "Dinner";
-                            chooseAndAddItemsToEvent(root, eventNew, {"Makanan Utama", "Pastry", "Minuman"});
-                            eventList = addEvent(eventList, eventNew);
-                            break;
-                        case 6:
-                            cout << "Back" << endl;
-                            break;
-                        default:
-                            cout << "Pilihan tidak tersedia" << endl;
-                            break;
+
+                    if (choice == customMenus.size() + 6) {
+                        EventCategory newMenu = createNewMenu(root);
+                        customMenus.push_back(newMenu);
+                    } else if (choice > 0 && choice <= 5) {
+                        handleMenuChoice(root, eventList, customMenus, choice);
+                    } else if (choice >= 6 && choice < 6 + customMenus.size()) {
+                        handleMenuChoice(root, eventList, customMenus, choice);
+                    } else if (choice == customMenus.size() + 7) {
+                        displayEvents(eventList); // Afficher les commandes passées
+                    } else {
+                        cout << "Pilihan tidak tersedia" << endl;
                     }
-                    cout << endl << "Current event" << endl;
-                    displayEvents(eventList);
-//                    currentEvent.push_back(eventNew);
-//                    for (const Event& event : currentEvent) {
-//                        cout << endl << "============" << event.orderId << "============" << endl;
-//                        cout << event.menu << endl;
-//                        cout << event.status << endl;
-//                        for (const auto& item : event.items) {
-//                            cout << item.first << " - " << item.second << endl;
-//                        }
-//                    }
                 }
                 break;
             case 2:
