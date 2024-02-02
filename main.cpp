@@ -71,6 +71,16 @@ struct linkedList {
     }
 };
 
+struct Promotion {
+    string name; // Nama promo
+    float discount; // Diskon
+    string expiration; // Tanggal berakhirnya promo
+};
+
+struct CouponCode : Promotion {
+    string code; // Kode promo
+};
+
 // Deklarasi fungsi
 Node* addItem(Node* parent, const string& name, float price, int stock);
 Node* addCategory(Node* parent, const string& name);
@@ -91,10 +101,12 @@ void displayEventChoice();
 void displayMenuChoice(const vector<EventCategory>& customMenus);
 void handleMenuChoice(Node* root, linkedList*& eventList, const vector<EventCategory>& customMenus, int choice, const string& date);
 EventCategory createNewMenu(Node* root);
-void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory);
+void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory, const vector<CouponCode>& promoCodes, const string& currentDate);
 string getCurrentDate();
 void displayOrderHistory(const vector<Event>& orderHistory);
 string nextDay(const string& currentDate);
+vector<CouponCode> initializePromoCodes();
+bool isDateExpired(const string& expiryDate, const string& currentDate);
 
 // MENU
 // Fungsi untuk menambahkan kategori baru
@@ -567,7 +579,7 @@ EventCategory createNewMenu(Node* root) {
 }
 
 // Fungsi untuk mengubah status order
-void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory) {
+void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory, const vector<CouponCode>& promoCodes, const string& currentDate) {
     int orderId;
     cout << "Masukkan ID order yang ingin diubah: ";
     cin >> orderId;
@@ -583,6 +595,33 @@ void updateOrderStatus(linkedList*& eventList, vector<Event>& orderHistory) {
     if (current == nullptr) {
         cout << "Order tidak ditemukan" << endl;
         return;
+    }
+
+    string promoCodeInput;
+    cout << "Masukkan kode promo (jika ada): ";
+    cin.ignore();
+    getline(cin, promoCodeInput);
+
+    float discount = 0.0f;
+    bool codeApplied = false;
+
+    for (const auto& promoCode : promoCodes) {
+        if (promoCode.code == promoCodeInput) {
+            if (isDateExpired(promoCode.expiration, currentDate)) {
+                cout << "Kode promo sudah kadaluarsa." << endl;
+                return;
+            } else {
+                codeApplied = true;
+                discount = promoCode.discount;
+                cout << "Kode promo valid: Apply " << (discount * 100) << "% discount. " << endl;
+                cout << "New total price: " << current->data.totalPrice * (1 - discount) << endl;
+                break;
+            }
+        }
+    }
+
+    if (!codeApplied && !promoCodeInput.empty()) {
+        cout << "Kode promo tidak valid atau tidak ditemukan." << endl;
     }
 
     // Mengubah status order menjadi 'selesai' dan memindahkannya ke orderHistory
@@ -650,6 +689,34 @@ string nextDay(const string& currentDate) {
     return ssOut.str();
 }
 
+// Fungsi untuk menginisialisasi promo codes
+vector<CouponCode> initializePromoCodes() {
+    vector<CouponCode> promoCodes;
+    promoCodes.push_back({"Promo1", 0.10, "2024-02-10", "CODE10"}); // 10% discount
+    promoCodes.push_back({"Promo2", 0.20, "2024-12-31", "CODE20"}); // 20%
+    promoCodes.push_back({"Promo3", 0.30, "2024-12-31", "CODE30"}); // 30%
+
+    return promoCodes;
+}
+
+// Fungsi untuk memeriksa apakah tanggal sudah lewat
+bool isDateExpired(const string& expiryDate, const string& currentDate) {
+
+    tm nowTm = {};
+    stringstream ssNow(currentDate);
+    ssNow >> get_time(&nowTm, "%Y-%m-%d");
+
+    tm expiryTm = {};
+    stringstream ssExpiry(expiryDate);
+    ssExpiry >> get_time(&expiryTm, "%Y-%m-%d");
+
+
+    return (nowTm.tm_year > expiryTm.tm_year ||
+            (nowTm.tm_year == expiryTm.tm_year && nowTm.tm_mon > expiryTm.tm_mon) ||
+            (nowTm.tm_year == expiryTm.tm_year && nowTm.tm_mon == expiryTm.tm_mon && nowTm.tm_mday > expiryTm.tm_mday));
+}
+
+
 int main() {
     int choice = 0, statusCafe = 0, choiceOpen = 0; // Status: 0 close ; 1 open ; 2 exit
     Node* root = new Node("Menu");
@@ -658,6 +725,7 @@ int main() {
     vector<EventCategory> customMenus;
     vector<Event> orderHistory;
     string currentDate = getCurrentDate();
+    vector<CouponCode> promoCodes = initializePromoCodes();
 
     while(statusCafe != 4) {
         displayStartingMenu();
@@ -683,7 +751,7 @@ int main() {
                     } else if (choice == customMenus.size() + 7) {
                         displayEvents(eventList); // Menampilkan event
                     } else if (choice == customMenus.size() + 8) {
-                        updateOrderStatus(eventList, orderHistory); // Menyajikan event
+                        updateOrderStatus(eventList, orderHistory, promoCodes, currentDate); // Mengubah status order
                     } else if (choice == customMenus.size() + 9) {
                         cout << "Kembali ke menu utama" << endl;
                     } else {
